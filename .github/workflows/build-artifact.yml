@@ -1,0 +1,46 @@
+name: Unsigned development artifact
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: dom, mbstring, xml, xmlwriter
+          coverage: none
+          tools: composer:v2
+      - run: npm ci
+      - run: npm audit --audit-level=high
+      - run: npm run lint -- --max-warnings=0
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: composer install --no-interaction --prefer-dist
+      - run: composer validate --strict
+      - run: composer audit
+      - run: composer test
+      - name: Validate metadata
+        run: |
+          curl --fail --location https://apps.nextcloud.com/schema/apps/info.xsd --output /tmp/songbook-info.xsd
+          php scripts/validate-metadata.php /tmp/songbook-info.xsd
+      - run: python3 scripts/build-dev-archive.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: songbook-unsigned-development
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
