@@ -36,6 +36,10 @@ jobs:
           PY
       - run: docker compose up -d --wait --wait-timeout 240 nextcloud
       - run: docker compose exec -T --user www-data nextcloud php occ app:enable songbook
+      - name: Restart web workers after installation and CLI app activation
+        run: |
+          docker compose restart nextcloud
+          docker compose up -d --wait --wait-timeout 90 nextcloud
       - run: python3 tests/integration/test_http.py
       - run: python3 tests/integration/test_library.py
       - name: Stop disposable instance

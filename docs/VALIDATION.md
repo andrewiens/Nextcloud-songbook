@@ -45,6 +45,7 @@ Nachweise: [Desktop](screenshots/phase2-desktop.jpg), [Tablet](screenshots/phase
 ## Behobene Fehler
 
 - Die fehlenden Bibliotheksrouten und Dateisystem-Listener wurden eingebunden.
+- Der erste GitHub-Lauf lieferte direkt nach der CLI-Aktivierung zunächst HTTP 404 für OCS-Routen; spätere Session-Aufrufe funktionierten. In einer zusätzlichen frischen lokalen Instanz scheiterte zunächst die Kontenanlage im Nextcloud-Kern. Nach Neustart bestanden alle sechs HTTP-Tests. CI startet daher die Webprozesse nach Installation und Aktivierung neu und wartet auf deren Bereitschaft. Die eigentliche Ursache im Nextcloud-/PHP-Startzustand ist nicht abschließend isoliert; keine Test-Erwartung wurde dafür abgeschwächt.
 - Die ursprüngliche exklusive Ordnersperre blockierte auch `Folder::newFile()`. Der Import nutzt nun die öffentliche Storage-API zur exklusiven Neuerstellung, aktualisiert den Dateicache und veröffentlicht Node-Ereignisse. Details und Grenzen stehen in [ARCHITECTURE.md](ARCHITECTURE.md).
 - Ein Speicher-ETag änderte sich bei einer raschen externen Änderung nicht. Die Prüfung bestätigt deshalb tatsächlichen Inhalt und aktualisierte Metadaten; ETags allein werden nicht als spätere Editor-Konfliktprüfung zugesichert.
 - Der vorgeschlagene Bibliotheksname folgt dem ausgewählten Ordner, ohne einen eigenen Namen zu überschreiben. Das persönliche Wurzelverzeichnis bleibt nicht verbindbar.

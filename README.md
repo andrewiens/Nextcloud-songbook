@@ -45,9 +45,12 @@ Die Umgebung verwendet ein eigenes Compose-Projekt `songbook-dev`, ein eigenes D
    docker compose exec --user www-data nextcloud php occ status
    docker compose exec --user www-data nextcloud php occ app:enable songbook
    docker compose exec --user www-data nextcloud php occ config:system:set debug --type=boolean --value=false
+   docker compose restart nextcloud
    ```
 
    Die Ausgabe von `occ status` muss Nextcloud 35 bestätigen. **Keine erzwungene Aktivierung** auf anderen Hauptversionen verwenden.
+
+   Der Neustart nach Installation/Aktivierung sorgt dafür, dass die Webprozesse den neuen App- und Routenstand laden. Die Tests beginnen erst nach dieser Initialisierung.
 
 5. [Lokale Nextcloud öffnen](http://127.0.0.1:8081), mit den lokalen Zugangsdaten anmelden und **Songbook** in der App-Navigation öffnen. Die direkte App-Adresse ist [Songbook](http://127.0.0.1:8081/index.php/apps/songbook/).
 

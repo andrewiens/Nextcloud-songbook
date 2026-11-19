@@ -37,6 +37,7 @@ docker compose run --rm node run build
 docker compose exec -T --user www-data nextcloud php occ upgrade
 docker compose exec -T --user www-data nextcloud php occ app:enable songbook
 docker compose exec -T --user www-data nextcloud php occ config:system:set debug --type=boolean --value=false
+docker compose restart nextcloud
 ```
 
 Die Migration legt die beiden Songbook-Tabellen an. Es werden dabei keine Lieddateien erzeugt oder verschoben. Vorhandene `.env`-Dateien nicht durch `.env.example` ersetzen. Die produktive Instanz bei Wolkensicher gehört nicht zu diesem lokalen Upgrade.
