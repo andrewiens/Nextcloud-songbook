@@ -22,6 +22,8 @@ Der Index entscheidet niemals über Zugriffsrechte. Jede Anfrage löst den Bibli
 
 Der Abgleich vergleicht die tatsächlichen Dateiversionen mit dem Index. Unveränderte Dateien müssen nicht erneut als Text gelesen werden. Metadaten ungültiger oder nicht mehr sichtbarer Dateien werden nicht als Liedliste ausgegeben. Ein eingeschränkter Leser darf den gemeinsamen Index nicht anhand seiner eigenen unvollständigen Sicht bereinigen.
 
+Dateisystemereignisse für Schreiben, Umbenennen und Löschen markieren betroffene Indexeinträge zusätzlich zur erneuten Prüfung. Der sichere Import benötigt einen Speicher mit exklusiver Neuerstellung (`fopen`-Modus `x`). Die lokale Testumgebung und Benutzerfreigaben wurden geprüft; weitere Speicher-/Erweiterungskombinationen sind in [ARCHITECTURE.md](ARCHITECTURE.md) als offene Freigabetests beschrieben.
+
 ## ChordPro-Teilmenge
 
 Für den Index werden `{title: ...}`, die Kurzform `{t: ...}`, `{artist: ...}` und `{key: ...}` erkannt. Fehlt ein Titel, dient der Dateiname als Ersatz. Die jeweils erste nichtleere Angabe wird verwendet. Die Verarbeitung akzeptiert UTF-8 einschließlich BOM und verschiedener Zeilenenden; diese bleiben im Original erhalten. Metadatenlängen werden für den Index begrenzt. Unbekannte Direktiven und Akkorde werden nicht verändert oder entfernt.
@@ -34,8 +36,9 @@ Die folgenden Befehle im Projektverzeichnis ausführen:
 docker compose run --rm node run build
 docker compose exec -T --user www-data nextcloud php occ upgrade
 docker compose exec -T --user www-data nextcloud php occ app:enable songbook
+docker compose exec -T --user www-data nextcloud php occ config:system:set debug --type=boolean --value=false
 ```
 
 Die Migration legt die beiden Songbook-Tabellen an. Es werden dabei keine Lieddateien erzeugt oder verschoben. Vorhandene `.env`-Dateien nicht durch `.env.example` ersetzen. Die produktive Instanz bei Wolkensicher gehört nicht zu diesem lokalen Upgrade.
 
-Offizielle Grundlagen: [Nextcloud-Dateisystem](https://docs.nextcloud.com/server/stable/developer_manual/basics/storage/filesystem.html), [Datenbankzugriff](https://docs.nextcloud.com/server/stable/developer_manual/basics/storage/database.html), [Migrationen](https://docs.nextcloud.com/server/stable/developer_manual/basics/storage/migrations.html), [ChordPro-Einführung](https://www.chordpro.org/chordpro/chordpro-introduction/). Stand: 13.11.2026.
+Offizielle Grundlagen: [Nextcloud-Dateisystem](https://docs.nextcloud.com/server/stable/developer_manual/basics/storage/filesystem.html), [Datenbankzugriff](https://docs.nextcloud.com/server/stable/developer_manual/basics/storage/database.html), [Migrationen](https://docs.nextcloud.com/server/stable/developer_manual/basics/storage/migrations.html), [ChordPro-Einführung](https://www.chordpro.org/chordpro/chordpro-introduction/). Implementierungsstand: 19.11.2026; [Prüfbericht](VALIDATION.md).

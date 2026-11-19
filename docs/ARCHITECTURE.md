@@ -1,32 +1,35 @@
 # Architektur und Phasengrenzen
 
-## Implementierte Grundlage
+Songbook läuft als native Nextcloud-App. Nextcloud stellt Anmeldung, Dependency Injection, Dateisystem, Datenbank und API-Middleware bereit. Vue 3 und TypeScript werden zu lokalen JavaScript-/CSS-Dateien gebaut. Es gibt keinen zusätzlichen Anwendungsserver oder Dienst für Banddaten.
 
-Songbook läuft als native Nextcloud-App im bestehenden PHP-Prozess. Nextcloud stellt Authentifizierung, Dependency Injection, Navigation und API-Middleware bereit. Die Vue-3-Anwendung wird als lokale JavaScript-/CSS-Datei ausgeliefert. Es gibt keinen separaten Anwendungsserver, keine zweite Benutzerverwaltung und keinen externen Dienst für Banddaten.
+## Daten und Zugriffsrechte
 
-Die Oberfläche trennt Navigation und API-Zugriff. Sie verwendet Nextcloud-Komponenten und dessen Theme-Variablen. Der erste reale API-Aufruf liest Status und Funktionsumfang vom Backend. Fehler bleiben sichtbar und sind erneut abrufbar; es werden keine Daten als erfolgreich geladen dargestellt, wenn die Anfrage scheitert.
+Eine Bibliothek verweist auf einen ausdrücklich ausgewählten bestehenden Ordner. Freigaben verwaltet Nextcloud Files. `PermissionService` löst Ordner ausschließlich unter `IRootFolder::getUserFolder()` des angemeldeten Benutzers auf. Bibliotheks- und Song-IDs verleihen keine Rechte. Beim Öffnen muss die Datei weiterhin ein lesbares direktes Kind des Bibliotheksordners sein.
 
-Phase 1 speichert keine Lieder oder Setlisten und verändert keine Nextcloud-Dateien. Es gibt deshalb noch keine Song-Migration, Dateisystem-Ereignisregistrierung oder Bibliotheksberechtigung, deren Funktion vorgetäuscht werden könnte.
+Die Migration erzeugt `songbook_libraries` und `songbook_songs` mit Nextclouds Datenbankabstraktion. Eine Ordner-ID ist eindeutig; pro Bibliothek und Datei-ID existiert höchstens ein Song. Der Index enthält nur Metadaten, keine führende Kopie des Liedtexts. Eine Umbenennung innerhalb derselben Bibliothek erhält die interne Song-ID.
 
-## Ziel für Phase 2
+`FileChangedListener` invalidiert Metadaten bei `NodeWrittenEvent`, `NodeRenamedEvent` und `NodeDeletedEvent`. Er liest keine fremden Lieddateien und lässt einen Fehler des erneuerbaren Index nicht zum Abbruch einer Files-Operation führen. Zusätzlich gleicht jede Liedliste sichtbare Datei-IDs, Namen und ETags ab. Unveränderte Dateien müssen nicht erneut gelesen werden.
 
-1. Eine Bibliothek wird mit einem vom Benutzer bewusst ausgewählten, bereits freigegebenen Nextcloud-Ordner oder Gruppenordner verbunden. Es wird kein persönlicher Entwickler- oder Administratorordner automatisch zur gemeinsamen Bibliothek.
-2. Songbook löst Ordner und Dateien immer über die Dateisystemsicht des angemeldeten Benutzers auf. Lesen und Bearbeiten werden serverseitig geprüft. Bibliotheks- und Setlisten-IDs sind keine Zugriffsberechtigung.
-3. ChordPro-Dateien bilden die führende Quelle. Die Datenbank speichert nur Referenzen und Metadaten. Interne Song-ID und Nextcloud-Datei-ID werden getrennt behandelt; stabile Datei-IDs helfen bei Umbenennungen.
-4. Migrationen führen Bibliotheken, Songs, Setlisten und Setlistenpositionen ein. Fremdbeziehungen und Löschregeln werden über Nextclouds portable Datenbankabstraktion umgesetzt. Setlistenpositionen besitzen eigene IDs, damit dasselbe Lied mehrfach vorkommen darf.
-5. Ein begrenzter Ordnerabgleich baut den Metadatenindex auf. Offizielle Dateisystemereignisse markieren betroffene Einträge zur Aktualisierung; ergänzende ressourcenschonende Abgleiche fangen externe Änderungen auf. Die konkreten Event-Klassen werden vor dieser Implementierung gegen Nextcloud 35 geprüft.
-6. Schreiboperationen vergleichen eine Dateiversion/ETag und behandeln Konflikte ausdrücklich. Das Originalformat bleibt erhalten; unbekannte ChordPro-Direktiven werden beim späteren Editor nicht gelöscht.
+Gelöschte oder aus der Bibliothek verschobene Dateien erscheinen nicht mehr und lassen sich über alte Song-IDs nicht öffnen. Indexzeilen können verbleiben. Sie werden nicht anhand der möglicherweise eingeschränkten Sicht eines Lesers global gelöscht. Administrative Bereinigung und Bibliothekslöschung sind noch offen; das gilt auch für Metadaten aus Integrationstests.
 
-Importgrenzen, UTF-8-Prüfung, Dateinamenprüfung, Sperren, Konfliktantworten und Mehrbenutzerfälle werden zusammen mit den jeweiligen schreibenden Endpunkten implementiert und getestet. Diese Eigenschaften werden für Phase 1 nicht als bereits vorhanden zugesichert.
+## Import und Konflikte
+
+`ChordProService` prüft Dateiname, UTF-8 und Größe. `ImportWriter` verwendet eine exklusive native Ordnersperre und die öffentliche Storage-API `fopen(path, 'x')` zur ausschließlichen Neuerstellung. `Folder::newFile()` kann überschreiben und kollidiert unter dieser Sperre mit seinen eigenen verschachtelten Sperren. Deshalb wird es hier nicht verwendet. Es gibt keinen unsicheren Rückfall auf Schreibmodus `w`, wenn ein Speicher `x` nicht unterstützt.
+
+Die Operation prüft aktuelle Ordnerrechte, vorhandene Dateinamen, Kapazität und Speicherplatz. Nach dem Schreiben aktualisiert die öffentliche Updater-API den Nextcloud-Dateicache; anschließend werden `NodeCreatedEvent` und `NodeWrittenEvent` ausgelöst. Scheitert das Schreiben nach erfolgreicher Neuerstellung, wird nur die eigene unvollständige Datei unter der gehaltenen Sperre entfernt. Scheitert später der Songindex, bleibt die Originaldatei erhalten und wird beim nächsten Abgleich erneut erfasst.
+
+Dieser Create-only-Pfad ist auf lokalem Nextcloud-Speicher und Benutzerfreigaben getestet. Externe Speicher, Verschlüsselung, Gruppenordner-ACLs und Erweiterungen mit eigenen Schreib-/Scan-Hooks brauchen gesonderte Freigabetests. Die Storage-API durchläuft nicht automatisch dieselben Vorab-Hooks wie jede Node-API-Operation. Eine Produktionsfreigabe für solche Kombinationen ist damit nicht gegeben.
+
+`version` enthält in Phase 2 das ETag. Einige Speicher können bei raschen Änderungen dasselbe ETag liefern; Dateisystemereignisse sorgen trotzdem für erneutes Einlesen. Für Phase 3 muss die Editor-Konfliktprüfung einen geeigneten Inhalts-/Versionsvergleich unter Sperre ergänzen.
+
+## Oberfläche
+
+`App.vue` steuert Navigation und Bibliotheksauswahl. `LibrarySettings.vue` verbindet Ordner; `SongLibrary.vue` übernimmt Suche, Sortierung, Import und Quelltextansicht. API-Antworten werden zur Laufzeit validiert. Abbruchsignale verhindern, dass eine verspätete Antwort eine neuere Auswahl überschreibt. Bei verweigertem Zugriff werden angezeigte Metadaten und Quelltexte entfernt. Inhalte werden als Text interpoliert, niemals als HTML ausgeführt.
+
+Grenzen: 256 KiB je Lied, höchstens 1.000 direkte Verzeichniseinträge, keine rekursive Indizierung. Erkannt werden Titel (`title`/`t`), Interpret (`artist`) und Tonart (`key`); das Original bleibt unverändert. Es gibt keine dauerhafte Speicherung von Lieddaten im Browser.
 
 ## Weitere Phasen
 
-Phase 3 ergänzt einen definierten ChordPro-Parser, Quelltexteditor, sichere Live-Vorschau und verlustfreien Export. Phase 4 ergänzt referenzbasierte Setlisten mit Reihenfolge und Notizen. Phase 5 ergänzt den ablenkungsarmen Auftrittsmodus. Phase 6 umfasst Freigabetests, Sicherheitsprüfung und Store-Veröffentlichung.
+Phase 3: Parser, formatierte Akkorde, Editor, Live-Vorschau, Speichern, Export und Konfliktprüfung. Phase 4: referenzbasierte Setlisten mit Reihenfolge, wiederholten Liedern und Notizen. Phase 5: Tablet-/Auftrittsmodus. Phase 6: Freigabetests, Sicherheitsprüfung und Store-Veröffentlichung. PWA und echte Offline-Synchronisation bleiben spätere Funktionen.
 
-Eine spätere PWA muss Nextclouds URL-Basis, Authentifizierung und mögliche Service-Worker-Konflikte berücksichtigen. Ein Startbildschirm-Link ist kein Offline-Modus. Deshalb registriert Phase 1 keinen Service Worker und speichert keine Lied- oder Anmeldedaten im Browser. Transponierung und Offline-Synchronisation bleiben getrennte spätere Funktionen.
-
-## Versions- und API-Grundlagen
-
-Am **13.11.2026** wurden die offiziellen Nextcloud-35-Dokumentationen zu [Systemanforderungen](https://docs.nextcloud.com/server/stable/admin_manual/installation/system_requirements.html), [App-Aufbau](https://docs.nextcloud.com/server/stable/developer_manual/app_development/intro.html), [Bootstrapping](https://docs.nextcloud.com/server/stable/developer_manual/app_development/bootstrap.html), [Metadaten](https://docs.nextcloud.com/server/stable/developer_manual/app_development/info.html), [Routing](https://docs.nextcloud.com/server/stable/developer_manual/basics/routing.html) und [Controllern](https://docs.nextcloud.com/server/stable/developer_manual/basics/controllers.html) konsultiert. PHP 8.3, 8.4 und 8.5 gehören zur NC35-Unterstützung. Vue wird in der App gebündelt; es wird keine interne globale Vue-Instanz des Servers vorausgesetzt. Die exakten installierten npm- und Composer-Versionen werden in den Lockdateien festgehalten.
-
-Die `stable`-URLs sind bewegliche Dokumentationslinks. Vor einer späteren Veröffentlichung Versionsstand und APIs erneut prüfen; der tatsächlich getestete Stand steht in `VALIDATION.md`.
+Verwendete öffentliche OCP-Schnittstellen wurden gegen die installierten Nextcloud-35-Quellen und OCP-35-Testtypen geprüft. Offizielle Grundlagen: [Dateisystem](https://docs.nextcloud.com/server/stable/developer_manual/basics/storage/filesystem.html), [Migrationen](https://docs.nextcloud.com/server/stable/developer_manual/basics/storage/migrations.html), [Datenbank](https://docs.nextcloud.com/server/stable/developer_manual/basics/storage/database.html). Tatsächliche Tests und Grenzen: [VALIDATION.md](VALIDATION.md).
