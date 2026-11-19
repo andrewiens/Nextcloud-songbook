@@ -26,7 +26,7 @@ let debounce: ReturnType<typeof setTimeout> | undefined
 function message(cause: unknown): string {
   if (cause instanceof LibraryApiError) {
     if ([403, 404].includes(cause.status)) return t('songbook', 'Der Zugriff ist nicht mehr möglich. Prüfe die Freigabe in Nextcloud Dateien und lade die Bibliotheken neu.')
-    if (cause.status === 409) return t('songbook', 'Eine Datei mit diesem Namen existiert bereits. Benenne die Importdatei um; vorhandene Lieder werden nicht überschrieben.')
+    if (cause.status === 409) return t('songbook', 'Die Datei existiert bereits oder der Ordner ist gerade gesperrt. Prüfe den Dateinamen und versuche es erneut. Vorhandene Lieder werden nicht überschrieben.')
     if (cause.status === 413) return t('songbook', 'Die Datei oder der Ordner ist zu groß. Erlaubt sind höchstens 256 KiB pro Lied und 1000 Einträge im Bibliotheksordner.')
     if ([400, 422].includes(cause.status)) return t('songbook', 'Die Datei konnte nicht verarbeitet werden. Verwende eine gültige ChordPro-Datei mit UTF-8-Kodierung.')
   }

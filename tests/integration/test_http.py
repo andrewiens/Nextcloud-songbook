@@ -92,8 +92,10 @@ class SongbookHttpTest(unittest.TestCase):
         self.assertEqual(data["capabilities"], {"songLibrary": True, "setlists": False})
 
     def test_anonymous_request_is_rejected(self):
-        status, _, _ = request(API_PATH, headers={"OCS-APIRequest": "true"})
-        self.assertIn(status, (401, 403))
+        base = API_PATH.removesuffix("status")
+        for path in ("status", "libraries", "folders", "songs?libraryId=1", "songs/1"):
+            status, _, _ = request(base + path, headers={"OCS-APIRequest": "true"})
+            self.assertIn(status, (401, 403))
 
     def test_both_band_members_can_use_api_concurrently(self):
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
@@ -101,7 +103,7 @@ class SongbookHttpTest(unittest.TestCase):
         for result in results:
             self.assert_status_payload(result)
 
-    def test_api_does_not_accept_writes(self):
+    def test_status_endpoint_does_not_accept_writes(self):
         status, _, _ = request(API_PATH, credentials=self.users[0], method="POST", data={})
         self.assertIn(status, (404, 405))
 
@@ -136,6 +138,10 @@ class SongbookHttpTest(unittest.TestCase):
                                            headers={"requesttoken": csrf_token(page)}))
         status, _, _ = request(API_PATH, opener=opener)
         self.assertEqual(status, 412, "Nextcloud OCS must reject a missing CSRF token with 412")
+        for path in ("libraries", "songs/import", "libraries/1/sync"):
+            status, _, _ = request(API_PATH.removesuffix("status") + path, opener=opener,
+                                    method="POST", data={})
+            self.assertEqual(status, 412, "Mutations must reject a session without a CSRF token")
 
 
 if __name__ == "__main__":

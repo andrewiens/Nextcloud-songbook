@@ -66,13 +66,19 @@ class Catalog {
 	}
 
 	public function createLibrary(int $folderId, string $name, string $uid): array {
+		$existing = $this->find('songbook_libraries', ['folder_id' => $folderId]);
+		if ($existing !== null) {
+			return $existing;
+		}
 		$this->insert('songbook_libraries', ['folder_id' => $folderId, 'name' => $name, 'created_by' => $uid, 'created_at' => time()]);
 		return $this->find('songbook_libraries', ['folder_id' => $folderId]) ?? throw new \RuntimeException('Library index unavailable');
 	}
 
 	public function saveSong(int $libraryId, int $fileId, array $metadata): array {
 		$keys = ['library_id' => $libraryId, 'file_id' => $fileId];
-		$this->insert('songbook_songs', $keys + $metadata + ['updated_at' => time()]);
+		if ($this->indexedSong($libraryId, $fileId) === null) {
+			$this->insert('songbook_songs', $keys + $metadata + ['updated_at' => time()]);
+		}
 		$q = $this->db->getQueryBuilder();
 		$q->update('songbook_songs');
 		foreach ($metadata + ['updated_at' => time()] as $column => $value) {

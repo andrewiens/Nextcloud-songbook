@@ -25,8 +25,8 @@ final class ChordProService {
 		if (strlen($content) > self::MAX_BYTES) {
 			throw new ApiException('Eine Lieddatei darf höchstens 256 KiB groß sein.', 413);
 		}
-		if (!mb_check_encoding($content, 'UTF-8') || str_contains($content, "\0")) {
-			throw new ApiException('ChordPro-Dateien müssen UTF-8-Text ohne Nullbytes enthalten.', 422);
+		if ($content === '' || !mb_check_encoding($content, 'UTF-8') || str_contains($content, "\0")) {
+			throw new ApiException('ChordPro-Dateien müssen nicht-leeren UTF-8-Text ohne Nullbytes enthalten.', 422);
 		}
 	}
 

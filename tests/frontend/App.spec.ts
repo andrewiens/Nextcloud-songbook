@@ -3,8 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import App from '../../src/App.vue'
 import { getAppStatus, type AppStatus } from '../../src/services/api'
+import { listLibraries } from '../../src/services/libraryApi'
 
 vi.mock('../../src/services/api', () => ({ getAppStatus: vi.fn() }))
+vi.mock('../../src/services/libraryApi', () => ({ listLibraries: vi.fn() }))
 vi.mock('@nextcloud/l10n', () => ({ translate: (_app: string, text: string) => text }))
 
 // Isolate Songbook behavior; actual Nextcloud component integration is checked
@@ -20,15 +22,16 @@ vi.mock('@nextcloud/vue/components/NcButton', () => ({ default: { template: '<bu
 
 const status: AppStatus = {
   app: 'songbook',
-  version: '0.1.0-dev',
+  version: '0.2.0-dev',
   apiVersion: 1,
-  capabilities: { songLibrary: false, setlists: false },
+  capabilities: { songLibrary: true, setlists: false },
 }
 let wrapper: VueWrapper | undefined
 
 beforeEach(() => {
   window.history.replaceState(null, '', '/')
   vi.mocked(getAppStatus).mockReset().mockResolvedValue(status)
+  vi.mocked(listLibraries).mockReset().mockResolvedValue([])
 })
 
 afterEach(() => {
@@ -43,13 +46,13 @@ describe('Songbook start page', () => {
     wrapper = mount(App)
 
     expect(wrapper.text()).toContain('Songbook wird geladen')
-    expect(wrapper.text()).not.toContain('Noch keine Lieder')
+    expect(wrapper.text()).not.toContain('Noch keine Bibliothek verbunden')
     expect(wrapper.get('[aria-live="polite"]').attributes('aria-busy')).toBe('true')
     complete(status)
     await flushPromises()
 
     expect(wrapper.get('h1').text()).toBe('Lieder')
-    expect(wrapper.get('h2').text()).toBe('Noch keine Lieder')
+    expect(wrapper.get('h2').text()).toBe('Noch keine Bibliothek verbunden')
     expect(wrapper.get('[aria-live="polite"]').attributes('aria-busy')).toBe('false')
     expect(getAppStatus).toHaveBeenCalledOnce()
   })
@@ -86,12 +89,12 @@ describe('Songbook start page', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Verbindung nicht möglich')
-    expect(wrapper.text()).not.toContain('Noch keine Lieder')
+    expect(wrapper.text()).not.toContain('Noch keine Bibliothek verbunden')
     expect(wrapper.text()).not.toContain('HTTP 401')
     await wrapper.get('button').trigger('click')
     await flushPromises()
 
-    expect(wrapper.get('h2').text()).toBe('Noch keine Lieder')
+    expect(wrapper.get('h2').text()).toBe('Noch keine Bibliothek verbunden')
     expect(getAppStatus).toHaveBeenCalledTimes(2)
   })
 

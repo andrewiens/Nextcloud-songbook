@@ -9,6 +9,7 @@ const emit = defineEmits<{ connected: [library: Library] }>()
 const listing = ref<FolderListing>()
 const trail = ref<number[]>([0])
 const name = ref('')
+let suggestedName = ''
 const busy = ref(false)
 const error = ref('')
 let request: AbortController | undefined
@@ -24,7 +25,9 @@ async function navigate(nextTrail: number[]): Promise<void> {
     if (current.signal.aborted) return
     listing.value = result
     trail.value = nextTrail
-    if (!name.value) name.value = result.folder.name
+    const nextName = nextTrail.length > 1 ? result.folder.name : ''
+    if (!name.value || name.value === suggestedName) name.value = nextName
+    suggestedName = nextName
   } catch {
     if (!current.signal.aborted) {
       listing.value = undefined

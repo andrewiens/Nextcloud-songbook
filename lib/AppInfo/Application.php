@@ -11,6 +11,10 @@ use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
+use OCA\Songbook\Listener\FileChangedListener;
+use OCP\Files\Events\Node\NodeWrittenEvent;
+use OCP\Files\Events\Node\NodeRenamedEvent;
+use OCP\Files\Events\Node\NodeDeletedEvent;
 
 final class Application extends App implements IBootstrap {
 	public const APP_ID = 'songbook';
@@ -20,7 +24,9 @@ final class Application extends App implements IBootstrap {
 	}
 
 	public function register(IRegistrationContext $context): void {
-		// Nextcloud resolves the concrete controllers and services automatically.
+		foreach ([NodeWrittenEvent::class, NodeRenamedEvent::class, NodeDeletedEvent::class] as $event) {
+			$context->registerEventListener($event, FileChangedListener::class);
+		}
 	}
 
 	public function boot(IBootContext $context): void {

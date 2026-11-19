@@ -23,7 +23,7 @@ final class StatusService {
 			'version' => $this->appManager->getAppVersion(Application::APP_ID),
 			'apiVersion' => 1,
 			'capabilities' => [
-				'songLibrary' => false,
+				'songLibrary' => true,
 				'setlists' => false,
 			],
 		];

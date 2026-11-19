@@ -161,7 +161,7 @@ class LibraryHttpTest(unittest.TestCase):
         })[0], (403, 404))
 
     def test_import_preserves_original_and_does_not_overwrite(self):
-        original = self.source("Original äöü")
+        original = "\ufeff" + self.source("Original äöü")
         song = self.import_song("preserved.chordpro", original, self.editor)
         status, content, _ = raw_request(dav_path(self.owner, self.folder_name + "/preserved.chordpro"), credentials=self.owner)
         self.assertEqual(status, 200)
@@ -195,7 +195,10 @@ class LibraryHttpTest(unittest.TestCase):
         self.assertIn(status, (201, 204))
         changed = next(item for item in self.songs(self.reader)["songs"] if item["id"] == song["id"])
         self.assertEqual(changed["title"], "After external edit")
-        self.assertNotEqual(changed["version"], song["version"])
+        # Filesystem etags can repeat for rapid writes on some storage backends.
+        # Node events must still invalidate the metadata and opening must read live bytes.
+        self.assertEqual(success(api("/songs/" + str(song["id"]), self.reader))["song"]["content"],
+                         self.source("After external edit"))
         destination = dav_path(self.owner, self.folder_name + "/external-after.pro")
         status, _, _ = raw_request(source_path, credentials=self.owner, method="MOVE", headers={
             "Destination": CONFIG["base_url"] + destination, "Overwrite": "F",
@@ -215,7 +218,7 @@ class LibraryHttpTest(unittest.TestCase):
                     "libraryId": self.library["id"], "filename": filename, "content": self.source("Invalid"),
                 })
                 self.assertIn(response[0], (400, 422))
-        for content, codes in (("bad\0content", (400, 422)), ("x" * (MAX_BYTES + 1), (413,))):
+        for content, codes in (("", (422,)), ("bad\0content", (400, 422)), ("x" * (MAX_BYTES + 1), (413,))):
             self.assertIn(api("/songs/import", self.owner, method="POST", data={
                 "libraryId": self.library["id"], "filename": "invalid-content.cho", "content": content,
             })[0], codes)
@@ -262,6 +265,28 @@ class LibraryHttpTest(unittest.TestCase):
             success(request(SHARES + "/" + str(shared["id"]), credentials=self.owner, method="DELETE"))
         self.assertIn(api("/songs/" + str(song["id"]), self.outsider)[0], (403, 404))
         self.assertFalse(any(item["id"] == self.library["id"] for item in success(api("/libraries", self.outsider))["libraries"]))
+
+    def test_moving_song_outside_library_revokes_its_reference(self):
+        song = self.import_song("move-outside.cho")
+        source = dav_path(self.owner, self.folder_name + "/move-outside.cho")
+        destination = dav_path(self.owner, "move-outside-" + secrets.token_hex(5) + ".cho")
+        self.assertIn(raw_request(source, credentials=self.owner, method="MOVE", headers={
+            "Destination": CONFIG["base_url"] + destination, "Overwrite": "F",
+        })[0], (201, 204))
+        self.assertFalse(any(item["id"] == song["id"] for item in self.songs()["songs"]))
+        for credentials in (self.owner, self.editor, self.reader):
+            self.assertEqual(api("/songs/" + str(song["id"]), credentials)[0], 404)
+
+    def test_malformed_parameters_and_personal_root_are_rejected(self):
+        for path in ("/songs?libraryId[]=1", "/songs?libraryId=-1", "/songs?libraryId=1&sort=unknown"):
+            self.assertEqual(api(path, self.owner)[0], 400)
+        self.assertEqual(api("/songs/import", self.owner, method="POST", data={
+            "libraryId": self.library["id"], "filename": {"name": "bad.cho"}, "content": ["bad"],
+        })[0], 400)
+        home = success(api("/folders?folderId=0", self.owner))["folder"]
+        self.assertEqual(api("/libraries", self.owner, method="POST", data={
+            "name": "Do not link the entire home", "folderId": home["id"],
+        })[0], 400)
 
 
 if __name__ == "__main__":

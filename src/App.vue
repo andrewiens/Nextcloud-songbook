@@ -35,6 +35,7 @@ async function connect(preferredId?: number): Promise<void> {
   libraries.value = []
   try {
     await getAppStatus(current.signal)
+    if (current.signal.aborted) return
     const result = await listLibraries(current.signal)
     if (current.signal.aborted) return
     libraries.value = result

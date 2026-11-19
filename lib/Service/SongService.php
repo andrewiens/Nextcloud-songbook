@@ -19,6 +19,7 @@ final class SongService {
 		private readonly Catalog $catalog,
 		private readonly LibraryService $libraries,
 		private readonly ChordProService $chordpro,
+		private readonly ImportWriter $writer,
 	) {
 	}
 
@@ -76,7 +77,7 @@ final class SongService {
 	}
 
 	public function listing(int $libraryId, string $search = '', string $sort = 'title'): array {
-		if (strlen($search) > 200 || !mb_check_encoding($search, 'UTF-8') || !in_array($sort, ['title', 'artist', 'key'], true)) {
+		if (!mb_check_encoding($search, 'UTF-8') || mb_strlen($search, 'UTF-8') > 200 || !in_array($sort, ['title', 'artist', 'key'], true)) {
 			throw new ApiException('Ungültige Suche oder Sortierung.', 400);
 		}
 		$folder = $this->libraries->resolve($libraryId);
@@ -124,19 +125,7 @@ final class SongService {
 		$folder = $this->libraries->resolve($libraryId, true);
 		$this->chordpro->validateFilename($filename);
 		$this->chordpro->validateContent($content);
-		$folder->verifyPath($filename);
-		$folder->lock(ILockingProvider::LOCK_EXCLUSIVE);
-		try {
-			if ($folder->nodeExists($filename)) {
-				throw new ApiException('Eine Datei mit diesem Namen existiert bereits.', 409);
-			}
-			if (count($folder->getDirectoryListing()) >= self::MAX_ENTRIES) {
-				throw new ApiException('Die Bibliothek ist auf 1000 Einträge begrenzt.', 413);
-			}
-			$file = $folder->newFile($filename, $content);
-		} finally {
-			$folder->unlock(ILockingProvider::LOCK_EXCLUSIVE);
-		}
+		$file = $this->writer->create($folder, $filename, $content);
 		// A failed index update leaves the original file intact; listing retries it.
 		return ['song' => $this->indexFile($libraryId, $file, true)];
 	}

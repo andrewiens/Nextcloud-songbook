@@ -7,7 +7,9 @@ export class ImportValidationError extends Error {
 
 /** Preserve original UTF-8 bytes, including a possible BOM, through JSON transport. */
 export function decodeChordPro(filename: string, bytes: ArrayBuffer): string {
-  if (!/\.(cho|pro|chordpro)$/i.test(filename) || /[/\\\x00-\x1f]/.test(filename)) throw new ImportValidationError('extension')
+  // eslint-disable-next-line no-control-regex -- Control bytes are invalid in import filenames.
+  if (!/\.(cho|pro|chordpro)$/i.test(filename) || /[/\\\x00-\x1f\x7f]/.test(filename)
+    || filename.startsWith('.') || filename.trim() !== filename || new TextEncoder().encode(filename).byteLength > 255) throw new ImportValidationError('extension')
   if (bytes.byteLength > MAX_SONG_BYTES) throw new ImportValidationError('size')
   if (bytes.byteLength === 0) throw new ImportValidationError('empty')
   let text: string

@@ -17,15 +17,15 @@ final class StatusServiceTest extends TestCase {
 		$appManager->expects(self::once())
 			->method('getAppVersion')
 			->with('songbook')
-			->willReturn('0.1.1-dev');
+			->willReturn('0.2.0-dev');
 
 		$status = (new StatusService($appManager))->getStatus();
 
 		self::assertSame([
 			'app' => 'songbook',
-			'version' => '0.1.1-dev',
+			'version' => '0.2.0-dev',
 			'apiVersion' => 1,
-			'capabilities' => ['songLibrary' => false, 'setlists' => false],
+			'capabilities' => ['songLibrary' => true, 'setlists' => false],
 		], $status);
 	}
 }
